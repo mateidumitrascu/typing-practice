@@ -12,8 +12,8 @@ import (
 var corpus string
 
 const (
-	SetMin = 30
-	SetMax = 45
+	DefaultSetMin = 30
+	DefaultSetMax = 45
 
 	minLen       = 3
 	maxLen       = 12
@@ -25,8 +25,9 @@ const (
 )
 
 type Generator struct {
-	common []string
-	pools  map[rune]*pool
+	common         []string
+	pools          map[rune]*pool
+	setMin, setMax int
 }
 
 // pool holds words containing a letter, with cumulative density weights
@@ -37,7 +38,7 @@ type pool struct {
 }
 
 func NewGenerator() *Generator {
-	g := &Generator{pools: make(map[rune]*pool)}
+	g := &Generator{pools: make(map[rune]*pool), setMin: DefaultSetMin, setMax: DefaultSetMax}
 	rank := 0
 	for w := range strings.FieldsSeq(corpus) {
 		w = strings.ToLower(strings.TrimSpace(w))
@@ -73,12 +74,20 @@ func NewGenerator() *Generator {
 	return g
 }
 
-func SetLength() int {
-	return SetMin + rand.IntN(SetMax-SetMin+1)
+// SetLengthRange overrides how many words a generated set contains.
+// Invalid ranges are ignored.
+func (g *Generator) SetLengthRange(min, max int) {
+	if min >= 1 && max >= min {
+		g.setMin, g.setMax = min, max
+	}
+}
+
+func (g *Generator) SetLength() int {
+	return g.setMin + rand.IntN(g.setMax-g.setMin+1)
 }
 
 func (g *Generator) Set() []string {
-	n := SetLength()
+	n := g.SetLength()
 	out := make([]string, 0, n)
 	prev := ""
 	for len(out) < n {
@@ -97,7 +106,7 @@ func (g *Generator) LetterSet(letter rune) ([]string, error) {
 	if !ok {
 		return nil, fmt.Errorf("no words available for letter %q", letter)
 	}
-	n := SetLength()
+	n := g.SetLength()
 	out := make([]string, 0, n)
 	prev := ""
 	for len(out) < n {

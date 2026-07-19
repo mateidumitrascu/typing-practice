@@ -6,11 +6,22 @@ import (
 )
 
 func TestSetLengthInRange(t *testing.T) {
+	g := NewGenerator()
 	for range 1000 {
-		n := SetLength()
-		if n < SetMin || n > SetMax {
-			t.Fatalf("SetLength() = %d, want %d..%d", n, SetMin, SetMax)
+		n := g.SetLength()
+		if n < DefaultSetMin || n > DefaultSetMax {
+			t.Fatalf("SetLength() = %d, want %d..%d", n, DefaultSetMin, DefaultSetMax)
 		}
+	}
+	g.SetLengthRange(10, 12)
+	for range 100 {
+		if n := g.SetLength(); n < 10 || n > 12 {
+			t.Fatalf("SetLength() = %d after SetLengthRange(10, 12)", n)
+		}
+	}
+	g.SetLengthRange(0, -1) // invalid, must keep previous range
+	if n := g.SetLength(); n < 10 || n > 12 {
+		t.Fatalf("invalid range was applied, got length %d", n)
 	}
 }
 
@@ -18,7 +29,7 @@ func TestSetWordsValid(t *testing.T) {
 	g := NewGenerator()
 	for range 50 {
 		set := g.Set()
-		if len(set) < SetMin || len(set) > SetMax {
+		if len(set) < DefaultSetMin || len(set) > DefaultSetMax {
 			t.Fatalf("set length %d out of range", len(set))
 		}
 		for i, w := range set {

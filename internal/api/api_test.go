@@ -11,6 +11,7 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 
+	"github.com/mateidumitrascu/typepractice/internal/config"
 	"github.com/mateidumitrascu/typepractice/internal/store"
 )
 
@@ -25,7 +26,7 @@ func newTestServer(t *testing.T) http.Handler {
 	if err := st.CreateUser(t.Context(), "matei", string(hash)); err != nil {
 		t.Fatal(err)
 	}
-	return New(st, "", fstest.MapFS{"index.html": &fstest.MapFile{Data: []byte("ok")}})
+	return New(st, config.Default(), fstest.MapFS{"index.html": &fstest.MapFile{Data: []byte("ok")}})
 }
 
 func do(t *testing.T, h http.Handler, method, path, token string, body any) *httptest.ResponseRecorder {
@@ -177,7 +178,9 @@ func TestBasePathMount(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { st.Close() })
-	h := New(st, "/typing", fstest.MapFS{"index.html": &fstest.MapFile{Data: []byte("ok")}})
+	cfg := config.Default()
+	cfg.BasePath = "/typing"
+	h := New(st, cfg, fstest.MapFS{"index.html": &fstest.MapFile{Data: []byte("ok")}})
 
 	if w := do(t, h, "GET", "/typing/api/words", "", nil); w.Code != http.StatusOK {
 		t.Errorf("GET /typing/api/words: got %d, want 200", w.Code)

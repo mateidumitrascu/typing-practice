@@ -17,32 +17,34 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 
+	"github.com/mateidumitrascu/typepractice/internal/config"
 	"github.com/mateidumitrascu/typepractice/internal/stats"
 	"github.com/mateidumitrascu/typepractice/internal/store"
 	"github.com/mateidumitrascu/typepractice/internal/theme"
 	"github.com/mateidumitrascu/typepractice/internal/words"
 )
 
-const (
-	sessionTTL    = 30 * 24 * time.Hour
-	sessionCookie = "session"
-)
+const sessionCookie = "session"
 
 type Server struct {
 	store    *store.Store
 	gen      *words.Generator
+	cfg      config.Config
 	basePath string
 	limiter  *rateLimiter
 }
 
-// New builds the full handler. basePath ("" or "/typing") is where the app is
-// mounted; webFS is the built web client, served at the base path root.
-func New(st *store.Store, basePath string, webFS fs.FS) http.Handler {
+// New builds the full handler. cfg.BasePath ("" or "/typing") is where the app
+// is mounted; webFS is the built web client, served at the base path root.
+func New(st *store.Store, cfg config.Config, webFS fs.FS) http.Handler {
+	gen := words.NewGenerator()
+	gen.SetLengthRange(cfg.SetMinWords, cfg.SetMaxWords)
 	s := &Server{
 		store:    st,
-		gen:      words.NewGenerator(),
-		basePath: strings.TrimSuffix(basePath, "/"),
-		limiter:  newRateLimiter(5, time.Minute),
+		gen:      gen,
+		cfg:      cfg,
+		basePath: strings.TrimSuffix(cfg.BasePath, "/"),
+		limiter:  newRateLimiter(cfg.LoginRateLimit, cfg.LoginRateWindow),
 	}
 
 	mux := http.NewServeMux()
@@ -99,7 +101,7 @@ func userID(r *http.Request) int64 {
 }
 
 func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
-	if !s.limiter.allow(clientIP(r)) {
+	if !s.limiter.allow(s.clientIP(r)) {
 		jsonError(w, http.StatusTooManyRequests, "too many login attempts, try again later")
 		return
 	}
@@ -123,7 +125,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	raw := make([]byte, 32)
 	rand.Read(raw)
 	token := hex.EncodeToString(raw)
-	expires := time.Now().Add(sessionTTL)
+	expires := time.Now().Add(s.cfg.SessionTTL)
 	if err := s.store.CreateSession(r.Context(), hashToken(token), u.ID, expires); err != nil {
 		internalError(w, err)
 		return
@@ -133,7 +135,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	http.SetCookie(w, &http.Cookie{
 		Name: sessionCookie, Value: token,
 		Path: s.basePath + "/", Expires: expires,
-		HttpOnly: true, Secure: true, SameSite: http.SameSiteLaxMode,
+		HttpOnly: true, Secure: s.cfg.CookieSecure, SameSite: http.SameSiteLaxMode,
 	})
 	writeJSON(w, http.StatusOK, map[string]any{
 		"token":      token,
@@ -150,7 +152,7 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 	}
 	http.SetCookie(w, &http.Cookie{
 		Name: sessionCookie, Value: "", Path: s.basePath + "/", MaxAge: -1,
-		HttpOnly: true, Secure: true, SameSite: http.SameSiteLaxMode,
+		HttpOnly: true, Secure: s.cfg.CookieSecure, SameSite: http.SameSiteLaxMode,
 	})
 	w.WriteHeader(http.StatusNoContent)
 }
@@ -214,9 +216,9 @@ func (s *Server) handleCreateResult(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleListResults(w http.ResponseWriter, r *http.Request) {
-	limit := 20
+	limit := s.cfg.ResultsDefaultLimit
 	if q := r.URL.Query().Get("limit"); q != "" {
-		if n, err := strconv.Atoi(q); err == nil && n > 0 && n <= 500 {
+		if n, err := strconv.Atoi(q); err == nil && n > 0 && n <= s.cfg.ResultsMaxLimit {
 			limit = n
 		}
 	}
@@ -229,7 +231,7 @@ func (s *Server) handleListResults(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
-	st, err := s.store.UserStats(r.Context(), userID(r), 100)
+	st, err := s.store.UserStats(r.Context(), userID(r), s.cfg.StatsSeriesLimit)
 	if err != nil {
 		internalError(w, err)
 		return
@@ -284,10 +286,13 @@ func hashToken(token string) string {
 	return hex.EncodeToString(sum[:])
 }
 
-// clientIP prefers CF-Connecting-IP since the app runs behind a Cloudflare tunnel.
-func clientIP(r *http.Request) string {
-	if ip := r.Header.Get("CF-Connecting-IP"); ip != "" {
-		return ip
+// clientIP prefers the configured proxy header (CF-Connecting-IP by default,
+// since the app runs behind a Cloudflare tunnel).
+func (s *Server) clientIP(r *http.Request) string {
+	if s.cfg.IPHeader != "" {
+		if ip := r.Header.Get(s.cfg.IPHeader); ip != "" {
+			return ip
+		}
 	}
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
