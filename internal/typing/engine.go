@@ -5,7 +5,7 @@ package typing
 import (
 	"time"
 
-	"github.com/mateidumitrascu/typepractice/internal/stats"
+	"github.com/mateidumitrascu/typing-practice/internal/stats"
 )
 
 // maxExtra caps stray characters typed beyond a word's length so a runaway

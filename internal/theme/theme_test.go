@@ -21,8 +21,10 @@ func TestRegistry(t *testing.T) {
 		if !ok || got.Name != th.Name {
 			t.Errorf("Get(%q) failed", th.Name)
 		}
-		for _, c := range []string{th.Colors.Bg, th.Colors.Surface, th.Colors.Text,
-			th.Colors.Subtext, th.Colors.Accent, th.Colors.Error, th.Colors.Success} {
+		for _, c := range []string{
+			th.Colors.Bg, th.Colors.Surface, th.Colors.Text,
+			th.Colors.Subtext, th.Colors.Accent, th.Colors.Error, th.Colors.Success,
+		} {
 			if !hex.MatchString(c) {
 				t.Errorf("theme %q has invalid color %q", th.Name, c)
 			}

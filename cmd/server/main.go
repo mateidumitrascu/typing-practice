@@ -14,10 +14,10 @@ import (
 	"golang.org/x/crypto/bcrypt"
 	"golang.org/x/term"
 
-	"github.com/mateidumitrascu/typepractice/internal/api"
-	"github.com/mateidumitrascu/typepractice/internal/config"
-	"github.com/mateidumitrascu/typepractice/internal/store"
-	"github.com/mateidumitrascu/typepractice/web"
+	"github.com/mateidumitrascu/typing-practice/internal/api"
+	"github.com/mateidumitrascu/typing-practice/internal/config"
+	"github.com/mateidumitrascu/typing-practice/internal/store"
+	"github.com/mateidumitrascu/typing-practice/web"
 )
 
 func main() {

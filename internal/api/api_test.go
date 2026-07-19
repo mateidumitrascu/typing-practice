@@ -11,8 +11,8 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 
-	"github.com/mateidumitrascu/typepractice/internal/config"
-	"github.com/mateidumitrascu/typepractice/internal/store"
+	"github.com/mateidumitrascu/typing-practice/internal/config"
+	"github.com/mateidumitrascu/typing-practice/internal/store"
 )
 
 func newTestServer(t *testing.T) http.Handler {

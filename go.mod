@@ -1,4 +1,4 @@
-module github.com/mateidumitrascu/typepractice
+module github.com/mateidumitrascu/typing-practice
 
 go 1.25.0
 

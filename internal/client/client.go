@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mateidumitrascu/typepractice/internal/store"
-	"github.com/mateidumitrascu/typepractice/internal/theme"
+	"github.com/mateidumitrascu/typing-practice/internal/store"
+	"github.com/mateidumitrascu/typing-practice/internal/theme"
 )
 
 var ErrUnauthorized = errors.New("unauthorized")

@@ -17,11 +17,11 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 
-	"github.com/mateidumitrascu/typepractice/internal/config"
-	"github.com/mateidumitrascu/typepractice/internal/stats"
-	"github.com/mateidumitrascu/typepractice/internal/store"
-	"github.com/mateidumitrascu/typepractice/internal/theme"
-	"github.com/mateidumitrascu/typepractice/internal/words"
+	"github.com/mateidumitrascu/typing-practice/internal/config"
+	"github.com/mateidumitrascu/typing-practice/internal/stats"
+	"github.com/mateidumitrascu/typing-practice/internal/store"
+	"github.com/mateidumitrascu/typing-practice/internal/theme"
+	"github.com/mateidumitrascu/typing-practice/internal/words"
 )
 
 const sessionCookie = "session"

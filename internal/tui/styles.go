@@ -3,7 +3,7 @@ package tui
 import (
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/mateidumitrascu/typepractice/internal/theme"
+	"github.com/mateidumitrascu/typing-practice/internal/theme"
 )
 
 type Styles struct {

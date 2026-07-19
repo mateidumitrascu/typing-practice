@@ -8,10 +8,10 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/mateidumitrascu/typepractice/internal/client"
-	"github.com/mateidumitrascu/typepractice/internal/store"
-	"github.com/mateidumitrascu/typepractice/internal/theme"
-	"github.com/mateidumitrascu/typepractice/internal/typing"
+	"github.com/mateidumitrascu/typing-practice/internal/client"
+	"github.com/mateidumitrascu/typing-practice/internal/store"
+	"github.com/mateidumitrascu/typing-practice/internal/theme"
+	"github.com/mateidumitrascu/typing-practice/internal/typing"
 )
 
 type screen int
@@ -146,13 +146,18 @@ type wordsMsg struct {
 	words []string
 	err   error
 }
-type savedMsg struct{ err error }
-type statsMsg struct {
-	stats store.Stats
-	err   error
-}
-type themePutMsg struct{ err error }
-type tickMsg struct{}
+type (
+	savedMsg struct{ err error }
+	statsMsg struct {
+		stats store.Stats
+		err   error
+	}
+)
+
+type (
+	themePutMsg struct{ err error }
+	tickMsg     struct{}
+)
 
 // ---- commands ----
 
