@@ -7,5 +7,5 @@
 Run the following command in your terminal (you must have Go installed):
 
 ```
-go install github.com/mateidumitrascu/typing-practie/cmd/tui@latest
+go install github.com/mateidumitrascu/typing-practice/cmd/tui@latest
 ```
