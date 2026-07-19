@@ -1,0 +1,8 @@
+*.db
+*.db-wal
+*.db-shm
+.env
+/bin/
+web/node_modules/
+.DS_Store
+DESIGN.md
