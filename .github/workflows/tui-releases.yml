@@ -44,7 +44,7 @@ jobs:
         run: |
           BIN=typepractice-tui-${GOOS}-${GOARCH}
           [ "$GOOS" = "windows" ] && BIN=$BIN.exe
-          go build -o "$BIN" .
+          go build -o "$BIN" ./cmd/tui
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
