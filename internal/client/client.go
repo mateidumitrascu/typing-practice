@@ -6,7 +6,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"net"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -14,7 +17,13 @@ import (
 	"github.com/mateidumitrascu/typing-practice/internal/theme"
 )
 
-var ErrUnauthorized = errors.New("unauthorized")
+var (
+	ErrUnauthorized = errors.New("unauthorized")
+	// ErrUnavailable means the server could not be reached, or a proxy in
+	// front of it (Cloudflare) could not reach the server. Callers can offer
+	// a retry rather than treating it as a bug in the request.
+	ErrUnavailable = errors.New("server unavailable")
+)
 
 type Client struct {
 	base  string
@@ -51,7 +60,7 @@ func (c *Client) do(method, path string, body, out any) error {
 	}
 	resp, err := c.http.Do(req)
 	if err != nil {
-		return err
+		return transportError(err)
 	}
 	defer resp.Body.Close()
 
@@ -59,18 +68,62 @@ func (c *Client) do(method, path string, body, out any) error {
 		return ErrUnauthorized
 	}
 	if resp.StatusCode >= 400 {
-		var e struct {
-			Error string `json:"error"`
-		}
-		if json.NewDecoder(resp.Body).Decode(&e) == nil && e.Error != "" {
-			return errors.New(e.Error)
-		}
-		return fmt.Errorf("server returned %s", resp.Status)
+		return responseError(resp)
 	}
 	if out != nil {
 		return json.NewDecoder(resp.Body).Decode(out)
 	}
 	return nil
+}
+
+// transportError turns Go's verbose network errors into something worth
+// showing a user mid-typing-test.
+func transportError(err error) error {
+	var urlErr *url.Error
+	if errors.As(err, &urlErr) {
+		switch {
+		case urlErr.Timeout():
+			return fmt.Errorf("%w: timed out", ErrUnavailable)
+		case errors.Is(err, io.EOF):
+			return fmt.Errorf("%w: connection closed", ErrUnavailable)
+		}
+		var dnsErr *net.DNSError
+		if errors.As(err, &dnsErr) {
+			return fmt.Errorf("%w: cannot resolve %s", ErrUnavailable, dnsErr.Name)
+		}
+		var opErr *net.OpError
+		if errors.As(err, &opErr) {
+			return fmt.Errorf("%w: connection refused", ErrUnavailable)
+		}
+		return fmt.Errorf("%w: %v", ErrUnavailable, urlErr.Err)
+	}
+	return err
+}
+
+// responseError builds an error from a 4xx/5xx response. Gateway statuses get
+// a plain-language message: those come from the proxy, not the app, and their
+// bodies are HTML error pages rather than our JSON.
+func responseError(resp *http.Response) error {
+	switch resp.StatusCode {
+	case http.StatusBadGateway, http.StatusServiceUnavailable, http.StatusGatewayTimeout:
+		return fmt.Errorf("%w: the server is down or restarting (%d)", ErrUnavailable, resp.StatusCode)
+	case http.StatusTooManyRequests:
+		return errors.New("too many attempts, wait a minute and try again")
+	}
+	// Only trust a JSON body to hold our own error message; anything else
+	// (an HTML proxy page, say) would decode into noise.
+	if strings.HasPrefix(resp.Header.Get("Content-Type"), "application/json") {
+		var e struct {
+			Error string `json:"error"`
+		}
+		if json.NewDecoder(io.LimitReader(resp.Body, 1<<16)).Decode(&e) == nil && e.Error != "" {
+			return errors.New(e.Error)
+		}
+	}
+	if resp.StatusCode >= 500 {
+		return fmt.Errorf("%w: server error (%d)", ErrUnavailable, resp.StatusCode)
+	}
+	return fmt.Errorf("server returned %s", resp.Status)
 }
 
 func (c *Client) Login(username, password string) (token string, expiresAt time.Time, err error) {

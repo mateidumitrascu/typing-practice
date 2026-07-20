@@ -55,9 +55,10 @@ type App struct {
 	screen        screen
 	spin          spinner.Model
 
-	setupInput textinput.Model
-	setupErr   string
-	busy       bool
+	setupInput  textinput.Model
+	setupErr    string
+	setupSource string // where the server URL came from, shown on the setup screen
+	busy        bool
 
 	userInput textinput.Model
 	passInput textinput.Model
@@ -81,14 +82,17 @@ type App struct {
 	themeNote     string
 }
 
-func NewApp(cfg Config) *App {
+// NewApp builds the app. serverFlag is the --server value ("" if unset); it
+// takes precedence over the env var and the saved config.
+func NewApp(cfg Config, serverFlag string) *App {
 	a := &App{cfg: cfg, s: NewStyles(theme.Default())}
+	a.cfg.Server, a.setupSource = ResolveServer(serverFlag, cfg)
 
 	a.spin = spinner.New()
 	a.spin.Spinner = spinner.MiniDot
 
 	a.setupInput = textinput.New()
-	a.setupInput.Placeholder = "http://localhost:8080"
+	a.setupInput.Placeholder = DefaultServer
 	a.setupInput.Prompt = ""
 	a.setupInput.CharLimit = 200
 
@@ -118,7 +122,7 @@ func (a *App) applyStyles() {
 func (a *App) Init() tea.Cmd {
 	if a.cfg.Server == "" {
 		a.screen = screenSetup
-		a.setupInput.SetValue("http://localhost:8080")
+		a.setupInput.SetValue(DefaultServer)
 		return a.setupInput.Focus()
 	}
 	a.client = client.New(a.cfg.Server, a.cfg.Token)
@@ -261,7 +265,7 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case themesMsg:
 		if msg.err != nil {
 			a.screen = screenSetup
-			a.setupErr = "cannot reach server: " + msg.err.Error()
+			a.setupErr = msg.err.Error()
 			if a.setupInput.Value() == "" {
 				a.setupInput.SetValue(a.cfg.Server)
 			}
@@ -271,6 +275,7 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.themes = msg.themes
 		if a.cfg.Server != a.setupInput.Value() && a.setupInput.Value() != "" {
 			a.cfg.Server = a.setupInput.Value()
+			a.setupSource = "saved config"
 			SaveConfig(a.cfg)
 		}
 		a.busy = false
@@ -361,6 +366,13 @@ func (a *App) apiError(err error, prefix string) (tea.Model, tea.Cmd) {
 		a.passInput.Blur()
 		return a, nil
 	}
+	if errors.Is(err, client.ErrUnavailable) {
+		// Don't blame the user's request for an outage — say what's actually
+		// wrong and keep them on the menu so they can retry.
+		a.menuErr = err.Error() + " — try again in a moment"
+		a.screen = screenMenu
+		return a, nil
+	}
 	a.menuErr = prefix + err.Error()
 	a.screen = screenMenu
 	return a, nil
@@ -402,10 +414,15 @@ func (a *App) updateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (a *App) updateSetup(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if msg.String() == "enter" && !a.busy {
-		url := a.setupInput.Value()
+		url := NormalizeServer(a.setupInput.Value())
 		if url == "" {
 			return a, nil
 		}
+		if !ValidServer(url) {
+			a.setupErr = "that doesn't look like a valid URL"
+			return a, nil
+		}
+		a.setupInput.SetValue(url)
 		a.busy = true
 		a.setupErr = ""
 		a.client = client.New(url, a.cfg.Token)

@@ -61,7 +61,9 @@ func (a *App) viewSetup() string {
 	if a.busy {
 		b.WriteString("\n\n" + a.spin.View() + " " + a.s.Subtext.Render("connecting…"))
 	} else if a.setupErr != "" {
-		b.WriteString("\n\n" + a.s.Error.Render(a.setupErr))
+		b.WriteString("\n\n" + a.s.Error.Render(wrapText(a.setupErr, 42)))
+	} else if a.setupSource != "" && a.setupSource != "saved config" {
+		b.WriteString("\n\n" + a.s.Subtext.Render("from "+a.setupSource))
 	}
 	return a.s.Panel.Width(46).Render(b.String())
 }
@@ -309,4 +311,24 @@ func (a *App) viewThemes() string {
 
 func swatch(hex string) string {
 	return lipgloss.NewStyle().Foreground(lipgloss.Color(hex)).Render("██")
+}
+
+// wrapText greedily wraps on spaces so long error messages stay inside panels.
+func wrapText(s string, width int) string {
+	var b strings.Builder
+	line := 0
+	for i, w := range strings.Fields(s) {
+		switch {
+		case i == 0:
+			b.WriteString(w)
+			line = len(w)
+		case line+1+len(w) > width:
+			b.WriteString("\n" + w)
+			line = len(w)
+		default:
+			b.WriteString(" " + w)
+			line += 1 + len(w)
+		}
+	}
+	return b.String()
 }
